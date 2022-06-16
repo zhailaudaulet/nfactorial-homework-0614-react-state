@@ -1,8 +1,10 @@
-import { useState } from "react";
+import { logDOM } from "@testing-library/react";
+import { useEffect, useState } from "react";
 import { v4 as uuidv4 } from "uuid";
 import "./App.css";
 
-// button-group
+
+
 const buttons = [
   {
     type: "all",
@@ -18,66 +20,87 @@ const buttons = [
   },
 ];
 
-const toDoItems = [
-  {
-    key: uuidv4(),
-    label: "Have fun",
-  },
-  {
-    key: uuidv4(),
-    label: "Spread Empathy",
-  },
-  {
-    key: uuidv4(),
-    label: "Generate Value",
-  },
-];
+// const toDoItems = [
+//   {
+//     key: uuidv4(),
+//     label: "Have fun",
+//   },
+//   {
+//     key: uuidv4(),
+//     label: "Spread Empathy",
+//   },
+//   {
+//     key: uuidv4(),
+//     label: "Generate Value",
+//   },
+// ];
 
-// helpful links:
-// useState crash => https://blog.logrocket.com/a-guide-to-usestate-in-react-ecb9952e406c/
 function App() {
-  const [itemToAdd, setItemToAdd] = useState("");
-  //arrow declaration => expensive computation ex: API calls
-  const [items, setItems] = useState(() => toDoItems);
+  // localStorage.setItem('key',JSON.stringify(toDoItems))
 
-  const [filterType, setFilterType] = useState("");
+  const deleteItems = ({key})=>{
+    const itemIndex = items.findIndex((item)=>item.key===key);
+
+    const leftSide = items.slice(0,itemIndex)
+    const rightSide = items.slice(itemIndex+1,items.length)
+    setItems([...leftSide, ...rightSide]);
+    // writeInStorage()
+
+// Put the object into storage
+
+    
+
+    // console.log(leftSide)
+    // console.log(rightSide);
+    // console.log(itemToDelete);
+  }
+  
+
+  const [itemToAdd, setItemToAdd] = useState("");
+  const [items, setItems] = useState(() => JSON.parse(localStorage.getItem('key')) || []);
+
+  const [filterType, setFilterType] = useState("all");
+
+  const [filterLabel, setFilterLabel] = useState("");
+
+  const writeInStorage = () => {
+    localStorage.clear()
+    localStorage.setItem('key', JSON.stringify(items))
+  }
+
+  const handleFilterItemsByLabel = (event)=>{
+    setFilterLabel(event.target.value)
+  };
 
   const handleChangeItem = (event) => {
     setItemToAdd(event.target.value);
   };
 
+  useEffect(() => {
+    writeInStorage();
+  }, [items])
+
   const handleAddItem = () => {
-    // mutating !WRONG!
-    // const oldItems = items;
-    // oldItems.push({ label: itemToAdd, key: uuidv4() });
-    // setItems(oldItems);
+    if (itemToAdd.trim()===""){
+      alert("Caution! It's empty!")
+    }else{
+      setItems((prevItems) => [
+        { label: itemToAdd, key: uuidv4(), done:false, important:false },
+        ...prevItems,
+      ]);
+    }
 
-    // not mutating !CORRECT!
-    setItems((prevItems) => [
-      { label: itemToAdd, key: uuidv4() },
-      ...prevItems,
-    ]);
-
+    // console.log(items)
+    // const oldStorage = JSON.parse(localStorage.getItem('key'))
+    // console.log(oldStorage);
+    // writeInStorage();
+    // const newStorage = [ items, ...oldStorage]
+    // console.log(newStorage);
+    // localStorage.setItem('key',JSON.stringify(items))
     setItemToAdd("");
   };
 
   const handleItemDone = ({ key }) => {
-    //first way
-    // const itemIndex = items.findIndex((item) => item.key === key);
-    // const oldItem = items[itemIndex];
-    // const newItem = { ...oldItem, done: !oldItem.done };
-    // const leftSideOfAnArray = items.slice(0, itemIndex);
-    // const rightSideOfAnArray = items.slice(itemIndex + 1, items.length);
-    // setItems([...leftSideOfAnArray, newItem, ...rightSideOfAnArray]);
-
-    //  second way
-    // const changedItem = items.map((item) => {
-    //   if (item.key === key) {
-    //     return { ...item, done: item.done ? false : true };
-    //   } else return item;
-    // });
-
-    //second way updated
     setItems((prevItems) =>
       prevItems.map((item) => {
         if (item.key === key) {
@@ -85,6 +108,18 @@ function App() {
         } else return item;
       })
     );
+    // writeInStorage()
+  };
+
+  const handleItemImportant = ({ key }) => {
+    setItems((prevItems) =>
+      prevItems.map((item) => {
+        if (item.key === key) {
+          return { ...item, important: !item.important };
+        } else return item;
+      })
+    );
+    // writeInStorage()
   };
 
   const handleFilterItems = (type) => {
@@ -95,12 +130,25 @@ function App() {
 
   const amountLeft = items.length - amountDone;
 
+
   const filteredItems =
-    !filterType || filterType === "all"
+    /* !filterType ||*/
+    filterType === "all"
       ? items
       : filterType === "active"
       ? items.filter((item) => !item.done)
       : items.filter((item) => item.done);
+
+  const filterAgain = 
+    !filterLabel?filteredItems
+    :filteredItems.filter((item)=>item.label.toLowerCase().includes(filterLabel.toLowerCase()))
+
+
+  const handleKeyPress = (e)=>{
+    if(e.keyCode===13){
+      handleAddItem()
+    }
+  }
 
   return (
     <div className="todo-app">
@@ -115,6 +163,8 @@ function App() {
       <div className="top-panel d-flex">
         {/* Search-panel */}
         <input
+        value={filterLabel}
+        onChange={handleFilterItemsByLabel}
           type="text"
           className="form-control search-input"
           placeholder="type to search"
@@ -138,10 +188,10 @@ function App() {
 
       {/* List-group */}
       <ul className="list-group todo-list">
-        {filteredItems.length > 0 &&
-          filteredItems.map((item) => (
+        {filterAgain.length > 0 &&
+          filterAgain.map((item) => (
             <li key={item.key} className="list-group-item">
-              <span className={`todo-list-item${item.done ? " done" : ""}`}>
+              <span className={`todo-list-item ${item.done ? " done" : ""} ${item.important?"important":""}`}>
                 <span
                   className="todo-list-item-label"
                   onClick={() => handleItemDone(item)}
@@ -151,14 +201,18 @@ function App() {
 
                 <button
                   type="button"
+                  key={item.key}
                   className="btn btn-outline-success btn-sm float-right"
+                  onClick={()=>handleItemImportant(item)}
                 >
                   <i className="fa fa-exclamation" />
                 </button>
 
                 <button
                   type="button"
+                  key={uuidv4()}
                   className="btn btn-outline-danger btn-sm float-right"
+                  onClick={()=>deleteItems(item)}
                 >
                   <i className="fa fa-trash-o" />
                 </button>
@@ -175,12 +229,14 @@ function App() {
           className="form-control"
           placeholder="What needs to be done"
           onChange={handleChangeItem}
+          onKeyUp={handleKeyPress}
         />
-        <button className="btn btn-outline-secondary" onClick={handleAddItem}>
+        <button className="btn btn-outline-secondary" onClick={handleAddItem} >
           Add item
         </button>
       </div>
     </div>
+  
   );
 }
 
